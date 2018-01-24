@@ -3,28 +3,28 @@ var cheerio = require('cheerio');
 var express = require('express');
 var app = express();
 
-function getPixelValues() {
-    if(!getPixelValues._pixelValues) {
-        var dataFileBuffer = fs.readFileSync(__dirname + '/mnist/train-images-idx3-ubyte');
-        var labelFileBuffer = fs.readFileSync(__dirname + '/mnist/train-labels-idx1-ubyte');
-        getPixelValues._pixelValues = [];
-        getPixelValues._imgLabels = [];
-        // it would be nice with a checker instead of a hard coded 60000 limit here
-        for (var image = 0; image <= 59999; image++) {
-            var pixels = [];
-            for (var x = 0; x <= 27; x++) {
-                for (var y = 0; y <= 27; y++) {
-                    pixels.push(dataFileBuffer[(image * 28 * 28) + (y + (x * 28)) + 16]);
-                }
+var dataFileBuffer = fs.readFileSync(__dirname + '/mnist/train-images-idx3-ubyte');
+var labelFileBuffer = fs.readFileSync(__dirname + '/mnist/train-labels-idx1-ubyte');
+function getPixelValues(startIndex, count) {
+    var _pixelValues = [];
+    var _imgLabels = [];
+    if(!count) {
+        count = 1;
+    }
+    for (var image = startIndex; image < (startIndex + count); image++) {
+        var pixels = [];
+        for (var x = 0; x <= 27; x++) {
+            for (var y = 0; y <= 27; y++) {
+                pixels.push(dataFileBuffer[(image * 28 * 28) + (y + (x * 28)) + 16]);
             }
-            var label = JSON.stringify(labelFileBuffer[image + 8]);
-            getPixelValues._imgLabels.push(label);
-            getPixelValues._pixelValues.push(pixels);
         }
+        var label = JSON.stringify(labelFileBuffer[image + 8]);
+        _imgLabels.push(label);
+        _pixelValues.push(pixels);
     }
     return {
-        values: getPixelValues._pixelValues,
-        labels: getPixelValues._imgLabels
+        values: _pixelValues,
+        labels: _imgLabels
     }
 }
 
@@ -75,12 +75,13 @@ function getDrawFunc () {
             '}';
 }
 
-var imgDataList = getPixelValues();
+// var imgDataList = getPixelValues();
 
 // 1. print the data of an image
 app.get('/printImg/:idx', function (req, res) {
     var idx = parseInt(req.params.idx, 10);
-    var imgValues = imgDataList.values[idx];
+    // var imgValues = imgDataList.values[idx];
+    var imgValues = getPixelValues(idx).values[0];
     res.send('<div style="line-height:28px;">'
         + printImg(imgValues).replace(new RegExp(' ', 'g'), '&nbsp;&nbsp;')
         + '</div>');
@@ -89,7 +90,8 @@ app.get('/printImg/:idx', function (req, res) {
 // 2.1 draw an image with SVG (vanvas)
 app.get('/svg/:idx', function(req, res) {
     var idx = parseInt(req.params.idx, 10);
-    var imgValues = imgDataList.values[idx];
+    // var imgValues = imgDataList.values[idx];
+    var imgValues = getPixelValues(idx).values[0];
     var scale = 2;
     var h = 28 * scale, w = h;
     var _id = new Date().getTime();
@@ -119,6 +121,8 @@ app.get('/svgs/:count', function(req, res) {
         _res += $.html();
     }
     _res += '<script>' + getDrawFunc() + 'setTimeout(function () {';
+
+    var imgDataList = getPixelValues(0, count);
     var imgValues;
     for(var i=0;i<count;i++) {
         imgValues = imgDataList.values[i];
@@ -130,23 +134,25 @@ app.get('/svgs/:count', function(req, res) {
 });
 
 // 3.1 draw an image with divs
-app.get('/div-img/:idx', function (req, res) {
-    var idx = parseInt(req.params.idx, 10);
-    var imgValues = imgDataList.values[idx];
-    res.send(createDivImg(imgValues, 2));
-});
+//app.get('/div-img/:idx', function (req, res) {
+//    var idx = parseInt(req.params.idx, 10);
+//    // var imgValues = imgDataList.values[idx];
+//    var imgValues = getPixelValues(idx).values[0];
+//    res.send(createDivImg(imgValues, 2));
+//});
 
 // 3.2 draw images with divs
-app.get('/div-imgs/:count', function (req, res) {
-    var count = parseInt(req.params.count, 10);
-    var imgValues;
-    var _res = '';
-    for(var i=0;i<count;i++) {
-        imgValues = imgDataList.values[i];
-        _res += createDivImg(imgValues);
-    }
-    res.send(_res);
-});
+//app.get('/div-imgs/:count', function (req, res) {
+//    var count = parseInt(req.params.count, 10);
+//    var imgDataList = getPixelValues(0, count);
+//    var imgValues;
+//    var _res = '';
+//    for(var i=0;i<count;i++) {
+//        imgValues = imgDataList.values[i];
+//        _res += createDivImg(imgValues);
+//    }
+//    res.send(_res);
+//});
 
 app.get('/', function (req, res) {
     res.send('<h1>mnist</h1>');
